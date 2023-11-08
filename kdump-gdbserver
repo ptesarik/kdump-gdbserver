@@ -7,8 +7,8 @@ import argparse
 import json
 import addrxlat
 
-from kdumpfile import kdumpfile, KDUMP_KVADDR, attr_dir
-from kdumpfile.exceptions import AddressTranslationException, NoDataException
+from kdumpfile import Context as kdump, KVADDR
+from kdumpfile.exceptions import AddressTranslationError, NoDataError
 
 class VmcoreBase:
     """
@@ -18,7 +18,8 @@ class VmcoreBase:
     """
     def __init__(self, filename):
         self.filename = filename
-        self.kdump = kdumpfile(file=self.filename)
+        self.kdump = kdump()
+        self.kdump.open(self.filename)
         self.kdump.attr["addrxlat.ostype"] = "linux"
         self.arch = self.kdump.attr["arch.name"]
 
@@ -31,8 +32,8 @@ class VmcoreBase:
 
     def read_memory(self, address, size):
         try:
-            return self.kdump.read(KDUMP_KVADDR, address, size)
-        except(AddressTranslationException, NoDataException):
+            return self.kdump.read(KVADDR, address, size)
+        except(AddressTranslationError, NoDataError):
             return None
 
     def get_regs(self, reg_spec):
@@ -104,7 +105,7 @@ class VmcoreKernel(VmcoreBase):
             # first process registers from prstatus
             for cpu in range(num_cpu):
                 prstatus_regs = self.kdump.attr["cpu"][str(cpu)]["reg"]
-                regs = prstatus_regs.copy()
+                regs = dict(prstatus_regs.items())
                 self.__arch_reg_fixup[self.arch](regs)
 
                 pidtid = (1, cpu + 1)
@@ -139,7 +140,7 @@ class VmcoreKernel(VmcoreBase):
             # only CPU cores as threads mode
             for cpu in range(num_cpu):
                 pre_regs = self.kdump.attr["cpu"][str(cpu)]["reg"]
-                regs = pre_regs.copy()
+                regs = dict(pre_regs.items())
                 self.__arch_reg_fixup[self.arch](regs)
                 pidtid = (1, cpu+1)
                 self.threads_registers[pidtid] = regs
@@ -190,8 +191,7 @@ class VmcoreProcess(VmcoreBase):
         # translate process pgt kernel virtual address into physical
         rootpgt_virt = self.proc_data["rootpgt"]
         self.load_address = self.proc_data["loadaddr"]
-        system = self.kdump.get_addrxlat_sys()
-        ctx = self.kdump.get_addrxlat_ctx()
+        (ctx, system) = self.kdump.get_addrxlat()
 
         fulladdr = addrxlat.FullAddress(addrxlat.KVADDR, rootpgt_virt)
         fulladdr.conv(addrxlat.KPHYSADDR, ctx, system)
@@ -408,7 +408,7 @@ class GdbServer:
         size = int(command.group(2), 16)
         data = self.backend.read_memory(address, size)
         if data:
-            reply = "".join(["%2.2x" % b for b in data])
+            reply = "".join(["%2.2x" % ord(b) for b in data])
         else:
             reply = "E14"
         return reply
