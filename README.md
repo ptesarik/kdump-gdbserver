@@ -1,6 +1,10 @@
 kdump-gdbserver
 ===============
 
+**NOTE:** This program uses the 
+[pykdumpfile](https://pypi.org/project/pykdumpfile/)
+API, not the legacy bindings included with libkdumpfile.
+
 Introduction
 ------------
 
