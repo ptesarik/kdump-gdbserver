@@ -298,10 +298,10 @@ class GdbServer:
     }
 
     FORMAT_SPEC = {
-        4: "%8.8x",
-        8: "%16.16x",
-        10: "%20.20x",
-        16: "%32.32x",
+        4: b'%8.8x',
+        8: b'%16.16x',
+        10: b'%20.20x',
+        16: b'%32.32x',
     }
 
     def __init__(self, backend, hostname, port, debug=False):
@@ -339,11 +339,11 @@ class GdbServer:
         arch = self.backend.get_arch()
         self.reg_spec = GdbServer.ARCH_REGS[arch]
 
-    def threadid2str(self, pid, tid):
+    def threadid2bytes(self, pid, tid):
         if self.multiprocess:
-            return "p%x.%x" % (pid, tid)
+            return b'p%x.%x' % (pid, tid)
         else:
-            return "%x" % (tid)
+            return b'%x' % (tid)
 
     def bytes2threadid(self, spec):
         ret = (0, 0)
@@ -358,7 +358,7 @@ class GdbServer:
     def get_registers(self):
         regs = self.backend.get_regs(self.reg_spec)
 
-        reply = ""
+        reply = b''
         for regspec in self.reg_spec:
             name, size = regspec
 
@@ -366,87 +366,87 @@ class GdbServer:
                 value = regs[name]
                 nvalue =  value.to_bytes(size, "big")
                 nvalue = int.from_bytes(nvalue, "little")
-                reg_str = GdbServer.FORMAT_SPEC[size] % nvalue
+                reg_bytes = GdbServer.FORMAT_SPEC[size] % nvalue
             else:
-                reg_str = "x" * (size * 2)
+                reg_bytes = b'x' * (size * 2)
 
-            reply = reply + reg_str
+            reply = reply + reg_bytes
         return reply
 
     def get_thread_info(self):
         self.threads = self.backend.get_threads()
         pid, tid = next(self.threads)
-        return "m" + self.threadid2str(pid, tid)
+        return b'm' + self.threadid2bytes(pid, tid)
 
     def get_next_thread_info(self):
         try:
             pid, tid = next(self.threads)
-            return "m" + self.threadid2str(pid, tid)
+            return b'm' + self.threadid2bytes(pid, tid)
         except(StopIteration):
-            return "l"
+            return b'l'
 
     def return_empty(self):
-        return ""
+        return b''
 
     def return_ok(self):
-        return "OK"
+        return b'OK'
 
     def get_status(self):
         pid, tid = self.backend.get_current_pid_and_tid()
         # note hardcoded signal SIGTRAP
-        return "T05thread:%s;" % (self.threadid2str(pid, tid))
+        return b'T05thread:%s;' % (self.threadid2bytes(pid, tid))
 
     def detach(self):
         self.running = False
-        return "OK"
+        return b'OK'
 
     def kill(self):
         self.running = False
-        return ""
+        return b''
 
     def close_connection(self, command):
         self.running = False
-        return "OK"
+        return b'OK'
 
     def get_memory(self, command):
         address = int(command.group(1), 16)
         size = int(command.group(2), 16)
         data = self.backend.read_memory(address, size)
         if data:
-            reply = "".join(["%2.2x" % ord(b) for b in data])
+            reply = b''.join([b'%2.2x' % ord(b) for b in data])
         else:
-            reply = "E14"
+            reply = b'E14'
         return reply
 
     def switch_thread(self, command):
         pid, tid = self.bytes2threadid(command.group(1))
         self.backend.set_current_thread(pid, tid)
-        return "OK"
+        return b'OK'
 
     def thread_alive(self, command):
         pid, tid = self.bytes2threadid(command.group(1))
         if self.backend.thread_is_alive(pid, tid):
-            return "OK"
+            return b'OK'
         else:
-            return "E03"
+            return b'E03'
 
     def check_supported(self, command):
-        reply = ""
+        reply = b''
         features = command.group(1).split(b';')
         if b'multiprocess+' in features:
             self.multiprocess = True
-            reply = reply + "multiprocess+"
+            reply = reply + b'multiprocess+'
         return reply
 
     def check_attached(self, command):
-        reply = "1"
+        reply = b'1'
         return reply
 
     def get_extra_thread_info(self, command):
         pid, tid = self.bytes2threadid(command.group(1))
         reply = self.backend.get_thread_extra_info(pid, tid)
         reply = bytes(reply, "ascii")
-        return "".join(["%2.2x" % b for b in reply])
+        return b''.join([b'%2.2x' % b for b in reply])
 
     def run(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listen_sock:
@@ -471,11 +471,11 @@ class GdbServer:
                                 print("Packet received:", packet.decode("ascii"))
 
                             reply = self.process_packet(packet)
-                            reply = "$" + reply+self.calculate_checksum(bytes(reply, "ascii"))
+                            reply = b'$' + reply + self.calculate_checksum(reply)
                             if self.debug:
-                                print("Sending packet:", reply)
+                                print("Sending packet:", reply.decode("ascii"))
 
-                            conn.write(bytes(reply, "ascii"))
+                            conn.write(reply)
                             conn.flush()
 
                             if not self.running:
@@ -532,14 +532,14 @@ class GdbServer:
             if m:
                 return action(m)
 
-        return ""
+        return b''
 
     def calculate_checksum(self, mbytes):
         checksum = 0
 
         for byte in mbytes:
             checksum = (checksum + byte) % 256
-        ret = "#%2.2x" % (checksum)
+        ret = b'#%2.2x' % (checksum)
         return ret
 
 
