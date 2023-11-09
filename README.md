@@ -56,22 +56,6 @@ kernel symbol file that corresponds to given vmcore file.
 
     $ gdb
     <snip>
-    (gdb) file vmlinux -o 0x2b200000
-    Reading symbols from vmlinux...
-    (gdb) target remote localhost:1234
-    Remote debugging using localhost:1234
-    crash_setup_regs (oldregs=<optimized out>, newregs=<optimized out>)
-        at ./arch/x86/include/asm/kexec.h:95
-    95			asm volatile("movq %%rbx,%0" : "=m"(newregs->bx));
-    (gdb) bt
-    #0  crash_setup_regs (oldregs=<optimized out>, newregs=<optimized out>) at ./arch/x86/include/asm/kexec.h:95
-    #1  __crash_kexec (regs=0x0) at kernel/kexec_core.c:958
-    #2  0xffffffffac275a88 in panic (fmt=0xffffffffad47a7c9 "sysrq triggered crash\n") at kernel/panic.c:251
-    #3  0xffffffffac8a552a in sysrq_handle_crash (key=<optimized out>) at drivers/tty/sysrq.c:153
-    #4  0xffffffffac8a5f17 in __handle_sysrq (key=99, check_mask=false) at drivers/tty/sysrq.c:571
-
-    $ gdb
-    <snip>
     (gdb) file vmlinux -o 0x9200000
     Reading symbols from vmlinux...
     (gdb) target remote localhost:1234
