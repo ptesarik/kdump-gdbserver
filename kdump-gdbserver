@@ -309,6 +309,7 @@ class GdbServer:
             b'g': self.get_registers,
             b'qfThreadInfo': self.get_thread_info,
             b'qsThreadInfo': self.get_next_thread_info,
+            b'QStartNoAckMode': self.start_noack_mode,
             b'vMustReplyEmpty': self.return_empty,
             b'Hc-1': self.return_ok,
             b'?': self.get_status,
@@ -335,6 +336,7 @@ class GdbServer:
         self.threads = None
         self.running = False
         self.multiprocess = False
+        self.noack_mode = False
 
         arch = self.backend.get_arch()
         self.reg_spec = GdbServer.ARCH_REGS[arch]
@@ -385,6 +387,10 @@ class GdbServer:
         except(StopIteration):
             return b'l'
 
+    def start_noack_mode(self):
+        self.noack_mode = True
+        return b'OK'
+
     def return_empty(self):
         return b''
 
@@ -434,7 +440,7 @@ class GdbServer:
         features = command.group(1).split(b';')
         if b'multiprocess+' in features:
             self.multiprocess = True
-        return b'multiprocess+'
+        return b'multiprocess+;QStartNoAckMode+'
 
     def check_attached(self, command):
         reply = b'1'
@@ -463,8 +469,9 @@ class GdbServer:
                     packet = self.get_packet(conn)
                     if packet:
                         if packet != b"ERROR":
-                            conn.write(b"+")
-                            conn.flush()
+                            if not self.noack_mode:
+                                conn.write(b"+")
+                                conn.flush()
                             if self.debug:
                                 print("Packet received:", packet.decode("ascii"))
 
@@ -513,12 +520,11 @@ class GdbServer:
                 if len(p_checksum_bytes) != 2:
                     return None
 
-                p_checksum = int(p_checksum_bytes, 16)
-
-                if checksum == p_checksum:
-                    return packet
-                else:
-                    return b'ERROR'
+                if not self.noack_mode:
+                    p_checksum = int(p_checksum_bytes, 16)
+                    if checksum != p_checksum:
+                        return b'ERROR'
+                return packet
 
     def process_packet(self, packet):
         action = self.simple_commands.get(packet)
