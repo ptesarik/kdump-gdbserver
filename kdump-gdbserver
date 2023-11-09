@@ -494,9 +494,7 @@ class GdbServer:
             byte = conn.read(1)
             if len(byte) != 1:
                 return None
-
-            int_byte = int.from_bytes(byte, "big")
-            if int_byte == ord('$'):
+            if byte == b'$':
                 break
 
         while True:
@@ -504,11 +502,9 @@ class GdbServer:
             if len(byte) != 1:
                 return None
 
-            int_byte = int.from_bytes(byte, "big")
-
-            if int_byte != ord('#'):
+            if byte != b'#':
                 packet = packet + byte
-                checksum = (checksum + int_byte) % 256
+                checksum = (checksum + ord(byte)) % 256
             else:
                 p_checksum_bytes = conn.read(2)
                 if len(p_checksum_bytes) != 2:
