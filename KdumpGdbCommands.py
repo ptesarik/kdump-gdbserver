@@ -14,7 +14,7 @@ class KdumpGdbserverBase:
     @staticmethod
     def offsetof(parent, field):
         """find offset of field within given parent structure"""
-        return gdb.parse_and_eval("(unsigned int) (&((({} *) 0)->{}))".format(parent, field))
+        return parent[field].bitpos // 8
 
     @staticmethod
     def container_of(ptr, ctype, member):
