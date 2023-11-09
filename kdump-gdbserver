@@ -337,6 +337,7 @@ class GdbServer:
         self.running = False
         self.multiprocess = False
         self.noack_mode = False
+        self.big_packets = False
 
         arch = self.backend.get_arch()
         self.reg_spec = GdbServer.ARCH_REGS[arch]
@@ -377,10 +378,14 @@ class GdbServer:
 
     def get_thread_info(self):
         self.threads = self.backend.get_threads()
-        pid, tid = next(self.threads)
-        return b'm' + self.threadid2bytes(pid, tid)
+        return self.get_next_thread_info()
 
     def get_next_thread_info(self):
+        if self.big_packets:
+            threads = b','.join(self.threadid2bytes(pid, tid)
+                                for pid, tid in self.threads)
+            if len(threads):
+                return b'm' + threads
         try:
             pid, tid = next(self.threads)
             return b'm' + self.threadid2bytes(pid, tid)
@@ -437,6 +442,7 @@ class GdbServer:
             return b'E03'
 
     def check_supported(self, command):
+        self.big_packets = True
         features = command.group(1).split(b';')
         if b'multiprocess+' in features:
             self.multiprocess = True
