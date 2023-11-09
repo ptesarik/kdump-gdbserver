@@ -223,14 +223,14 @@ class GdbServer:
     Class that reads interprets gdb remote protocol and
     interface with class that reads from vmcore
     """
-    M_PACKET = "^m([0-9a-f]+)\,([0-9a-f]+)$"
-    H_PACKET = "^H[a-z](p?[0-9a-f\.]+)$"
-    T_PACKET = "^T(p?[0-9a-f\.]+)$"
-    Q_SUPPORTED_PACKET = "^qSupported:(.+)$"
-    Q_ATTACHED_PACKET = "^qAttached:(.+)$"
-    D_PID_PACKET = "^D;[0-9a-f]+$"
-    VKILL_PACKET = "^vKill;(p?[0-9a-f\.]+)$"
-    T_INFO_PACKET = "^qThreadExtraInfo,(p?[0-9a-f\.]+)$"
+    M_PACKET = b'^m([0-9a-f]+)\,([0-9a-f]+)$'
+    H_PACKET = b'^H[a-z](p?[0-9a-f\.]+)$'
+    T_PACKET = b'^T(p?[0-9a-f\.]+)$'
+    Q_SUPPORTED_PACKET = b'^qSupported:(.+)$'
+    Q_ATTACHED_PACKET = b'^qAttached:(.+)$'
+    D_PID_PACKET = b'^D;[0-9a-f]+$'
+    VKILL_PACKET = b'^vKill;(p?[0-9a-f\.]+)$'
+    T_INFO_PACKET = b'^qThreadExtraInfo,(p?[0-9a-f\.]+)$'
 
     ARCH_REGS = {
         "aarch64": (
@@ -345,14 +345,14 @@ class GdbServer:
         else:
             return "%x" % (tid)
 
-    def str2threadid(self, string):
+    def bytes2threadid(self, spec):
         ret = (0, 0)
-        if self.multiprocess and string[0] == "p":
-            pidtid = string[1:].split('.')
+        if self.multiprocess and spec.startswith(b'p'):
+            pidtid = spec[1:].split(b'.')
             if len(pidtid) == 2:
                 ret = (int(pidtid[0], 16), int(pidtid[1], 16))
         else:
-            ret = (self.backend.get_default_pid(), int(string, 16))
+            ret = (self.backend.get_default_pid(), int(spec, 16))
         return ret
 
     def get_registers(self):
@@ -419,12 +419,12 @@ class GdbServer:
         return reply
 
     def switch_thread(self, command):
-        pid, tid = self.str2threadid(command.group(1))
+        pid, tid = self.bytes2threadid(command.group(1))
         self.backend.set_current_thread(pid, tid)
         return "OK"
 
     def thread_alive(self, command):
-        pid, tid = self.str2threadid(command.group(1))
+        pid, tid = self.bytes2threadid(command.group(1))
         if self.backend.thread_is_alive(pid, tid):
             return "OK"
         else:
@@ -432,8 +432,8 @@ class GdbServer:
 
     def check_supported(self, command):
         reply = ""
-        features = command.group(1).split(";")
-        if "multiprocess+" in features:
+        features = command.group(1).split(b';')
+        if b'multiprocess+' in features:
             self.multiprocess = True
             reply = reply + "multiprocess+"
         return reply
@@ -443,7 +443,7 @@ class GdbServer:
         return reply
 
     def get_extra_thread_info(self, command):
-        pid, tid = self.str2threadid(command.group(1))
+        pid, tid = self.bytes2threadid(command.group(1))
         reply = self.backend.get_thread_extra_info(pid, tid)
         reply = bytes(reply, "ascii")
         return "".join(["%2.2x" % b for b in reply])
@@ -527,9 +527,8 @@ class GdbServer:
         if action:
             return action()
 
-        packet_str = packet.decode("ascii")
         for regex, action in self.regex_commands:
-            m = regex.match(packet_str)
+            m = regex.match(packet)
             if m:
                 return action(m)
 
