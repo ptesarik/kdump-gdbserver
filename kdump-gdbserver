@@ -306,14 +306,14 @@ class GdbServer:
 
     def __init__(self, backend, hostname, port, debug=False):
         self.simple_commands = {
-            "g": self.get_registers,
-            "qfThreadInfo": self.get_thread_info,
-            "qsThreadInfo": self.get_next_thread_info,
-            "vMustReplyEmpty": self.return_empty,
-            "Hc-1": self.return_ok,
-            "?": self.get_status,
-            "D": self.detach,
-            "k": self.kill,
+            b'g': self.get_registers,
+            b'qfThreadInfo': self.get_thread_info,
+            b'qsThreadInfo': self.get_next_thread_info,
+            b'vMustReplyEmpty': self.return_empty,
+            b'Hc-1': self.return_ok,
+            b'?': self.get_status,
+            b'D': self.detach,
+            b'k': self.kill,
         }
         # put most frequent packets first
         self.regex_commands = (
@@ -523,11 +523,11 @@ class GdbServer:
                     return b'ERROR'
 
     def process_packet(self, packet):
+        action = self.simple_commands.get(packet)
+        if action:
+            return action()
+
         packet_str = packet.decode("ascii")
-
-        if packet_str in self.simple_commands.keys():
-            return self.simple_commands[packet_str]()
-
         for regex, action in self.regex_commands:
             m = regex.match(packet_str)
             if m:
