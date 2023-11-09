@@ -450,6 +450,7 @@ class GdbServer:
             listen_sock.listen()
 
             client_sock, client_ip = listen_sock.accept()
+            client_sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             conn = client_sock.makefile('rwb')
 
             with client_sock:
