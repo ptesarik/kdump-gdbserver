@@ -82,7 +82,7 @@ class VmcoreKernel(VmcoreBase):
         super(VmcoreKernel, self).__init__(filename)
 
         try:
-            self.load_address = int(self.kdump.attr["linux.vmcoreinfo.lines.KERNELOFFSET"], 16)
+            self.load_address = int(self.kdump.vmcoreinfo_line('KERNELOFFSET'), 16)
         except KeyError:
             self.load_address = 0
 
