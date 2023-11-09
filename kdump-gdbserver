@@ -431,12 +431,10 @@ class GdbServer:
             return b'E03'
 
     def check_supported(self, command):
-        reply = b''
         features = command.group(1).split(b';')
         if b'multiprocess+' in features:
             self.multiprocess = True
-            reply = reply + b'multiprocess+'
-        return reply
+        return b'multiprocess+'
 
     def check_attached(self, command):
         reply = b'1'
