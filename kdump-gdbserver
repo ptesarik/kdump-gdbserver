@@ -312,7 +312,7 @@ class GdbServer:
             "vMustReplyEmpty": self.return_empty,
             "Hc-1": self.return_ok,
             "?": self.get_status,
-            "D": self.close_connection,
+            "D": self.detach,
             "k": self.kill,
         }
         # put most frequent packets first
@@ -355,7 +355,7 @@ class GdbServer:
             ret = (self.backend.get_default_pid(), int(string, 16))
         return ret
 
-    def get_registers(self, command):
+    def get_registers(self):
         regs = self.backend.get_regs(self.reg_spec)
 
         reply = ""
@@ -373,30 +373,34 @@ class GdbServer:
             reply = reply + reg_str
         return reply
 
-    def get_thread_info(self, command):
+    def get_thread_info(self):
         self.threads = self.backend.get_threads()
         pid, tid = next(self.threads)
         return "m" + self.threadid2str(pid, tid)
 
-    def get_next_thread_info(self, command):
+    def get_next_thread_info(self):
         try:
             pid, tid = next(self.threads)
             return "m" + self.threadid2str(pid, tid)
         except(StopIteration):
             return "l"
 
-    def return_empty(self, command):
+    def return_empty(self):
         return ""
 
-    def return_ok(self, command):
+    def return_ok(self):
         return "OK"
 
-    def get_status(self, command):
+    def get_status(self):
         pid, tid = self.backend.get_current_pid_and_tid()
         # note hardcoded signal SIGTRAP
         return "T05thread:%s;" % (self.threadid2str(pid, tid))
 
-    def kill(self, command):
+    def detach(self):
+        self.running = False
+        return "OK"
+
+    def kill(self):
         self.running = False
         return ""
 
@@ -522,7 +526,7 @@ class GdbServer:
         packet_str = packet.decode("ascii")
 
         if packet_str in self.simple_commands.keys():
-            return self.simple_commands[packet_str](packet_str)
+            return self.simple_commands[packet_str]()
 
         for regex, action in self.regex_commands:
             m = regex.match(packet_str)
