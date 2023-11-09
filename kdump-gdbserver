@@ -308,12 +308,12 @@ class GdbServer:
         self.simple_commands = {
             "g": self.get_registers,
             "qfThreadInfo": self.get_thread_info,
-            "qsThreadInfo": self.get_thread_info,
+            "qsThreadInfo": self.get_next_thread_info,
             "vMustReplyEmpty": self.return_empty,
             "Hc-1": self.return_ok,
             "?": self.get_status,
             "D": self.close_connection,
-            "k": self.close_connection,
+            "k": self.kill,
         }
         # put most frequent packets first
         self.regex_commands = (
@@ -374,16 +374,16 @@ class GdbServer:
         return reply
 
     def get_thread_info(self, command):
-        if command == "qfThreadInfo":
-            self.threads = self.backend.get_threads()
+        self.threads = self.backend.get_threads()
+        pid, tid = next(self.threads)
+        return "m" + self.threadid2str(pid, tid)
+
+    def get_next_thread_info(self, command):
+        try:
             pid, tid = next(self.threads)
             return "m" + self.threadid2str(pid, tid)
-        else:
-            try:
-                pid, tid = next(self.threads)
-                return "m" + self.threadid2str(pid, tid)
-            except(StopIteration):
-                return "l"
+        except(StopIteration):
+            return "l"
 
     def return_empty(self, command):
         return ""
@@ -396,12 +396,13 @@ class GdbServer:
         # note hardcoded signal SIGTRAP
         return "T05thread:%s;" % (self.threadid2str(pid, tid))
 
+    def kill(self, command):
+        self.running = False
+        return ""
+
     def close_connection(self, command):
         self.running = False
-        if command == "k":
-            return ""
-        else:
-            return "OK"
+        return "OK"
 
     def get_memory(self, command):
         address = int(command.group(1), 16)
