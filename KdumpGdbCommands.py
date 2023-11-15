@@ -104,6 +104,7 @@ usage: kdump-save-process-json <filename> <pid>"""
                                                             gdb.COMPLETE_FILENAME)
         self.ARCH_USR_REGS_FUNC = {
             "aarch64": KdumpGdbserverMakeProcessJson.get_thread_regs_aarch64,
+            "riscv:rv64": KdumpGdbserverMakeProcessJson.get_thread_regs_riscv64,
             "i386:x86-64": KdumpGdbserverMakeProcessJson.get_thread_regs_x86_64,
         }
 
@@ -150,6 +151,29 @@ usage: kdump-save-process-json <filename> <pid>"""
         regs["sp"] = int(pt_regs["user_regs"]["sp"])
         regs["pc"] = int(pt_regs["user_regs"]["pc"])
         regs["cpsr"] = int(pt_regs["user_regs"]["pstate"])
+        return regs
+
+    def get_thread_regs_riscv64(task):
+        """read user-land registers for riscv64 architecture"""
+
+        # find pointer to struct pt_regs on current task stack. It is pretty
+        # much implementation of task_pt_regs macro from arch/riscv/include/asm/processor.h
+        # #define task_pt_regs(tsk)						\
+        # 	((struct pt_regs *)(task_stack_page(tsk) + THREAD_SIZE		\
+        # 			    - ALIGN(sizeof(struct pt_regs), STACK_ALIGN)))
+        # Note values we use may not work for kernel built with CONFIG_KASAN
+        # TODO: look at kasan case
+        eval_string = "((struct pt_regs *)(0x4000 + (void *) (((struct task_struct *)0x%x)->stack)) - 1)" % (task)
+        pt_regs = gdb.parse_and_eval(eval_string)
+
+        regs = {}
+        aregs = ("a%d" % (x) for x in range(8))
+        sregs = ("s%d" % (x) for x in range(1, 12))
+        tregs = ("t%d" % (x) for x in range(7))
+        for reg_name in ("ra", "sp", "gp", "tp", *aregs, *sregs, *tregs):
+            regs[reg_name] = int(pt_regs[reg_name])
+        regs["fp"] = int(pt_regs["s0"])
+        regs["pc"] = int(pt_regs["epc"])
         return regs
 
     @staticmethod
@@ -234,6 +258,7 @@ usage: kdump-save-kernel-json <filename>"""
                                                            gdb.COMPLETE_FILENAME)
         self.ARCH_KER_REGS_FUNC = {
             "aarch64": KdumpGdbserverMakeKernelJson.get_thread_regs_ker_aarch64,
+            "riscv:rv64": KdumpGdbserverMakeKernelJson.get_thread_regs_ker_riscv64,
             "i386:x86-64": KdumpGdbserverMakeKernelJson.get_thread_regs_ker_x86_64,
         }
 
@@ -251,6 +276,21 @@ usage: kdump-save-kernel-json <filename>"""
         regs["x29"] = int(cpu_context["fp"])
         regs["sp"] = int(cpu_context["sp"])
         regs["pc"] = int(cpu_context["pc"])
+        return regs
+
+    @staticmethod
+    def get_thread_regs_ker_riscv64(task):
+        """read kernel task registers used by scheduler for riscv64 architecture"""
+        thread = task["thread"]
+
+        regs = {}
+        for x in range(12):
+            try:
+                regs["s%d" % (x)] = int(thread["s"][x])
+            except gdb.error:
+                pass
+        regs["pc"] = int(thread["ra"])
+        regs["sp"] = int(thread["sp"])
         return regs
 
     @staticmethod
