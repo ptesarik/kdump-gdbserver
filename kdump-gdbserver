@@ -83,7 +83,7 @@ class VmcoreKernel(VmcoreBase):
 
         try:
             self.load_address = int(self.kdump.vmcoreinfo_line('KERNELOFFSET'), 16)
-        except KeyError:
+        except NoDataError:
             self.load_address = 0
 
         self.__arch_reg_fixup = {
